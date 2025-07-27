@@ -2,6 +2,9 @@
 
 A minimal web application that converts images to ASCII art for wireframing AI agent interfaces.
 
+<img width="817" height="691" alt="Screenshot 2025-07-27 at 18 27 43" src="https://github.com/user-attachments/assets/42428561-5b80-4714-9912-0048efea3d62" />
+
+
 ## Setup Instructions
 
 1. **Install dependencies:**
