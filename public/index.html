@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASCII Wireframe Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    textarea { font-family: 'Courier New', monospace; white-space: pre; }
+    .spinner {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #3498db;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen">
+  <div class="bg-gray-800 border border-gray-700 p-6 rounded shadow-md w-full max-w-2xl m-6">
+    <h1 class="text-center mb-4 font-mono text-lg">
+      <pre class="text-gray-200 text-xs leading-tight">
+ ██████╗  ███████╗ ██████╗ ██╗   ██╗ ██╗ ██╗
+██╔══██╗ ██╔════╝ ██╔════╝ ██║   ██║ ██║ ██║
+███████║ ███████╗ ██║      ██║   ██║ ██║ ██║
+██╔══██║ ╚════██║ ██║      ██║   ██║ ██║ ██║
+██║  ██║ ███████║ ╚██████╗ ╚██████╔╝ ██║ ██║
+╚═╝  ╚═╝ ╚══════╝  ╚═════╝  ╚═════╝  ╚═╝ ╚═╝
+      </pre>
+      <p class="text-sm text-gray-400 mt-2">Wireframe Builder</p>
+    </h1>
+    <p class="text-center text-gray-300 mb-6">Welcome! Upload an image to generate ASCII art.</p>
+    <div class="mb-6">
+      <div id="dropZone" class="w-full min-h-64 bg-gray-900 border-2 border-dashed border-gray-600 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 hover:border-blue-500 focus:border-blue-500 outline-none">
+        <div class="w-20 h-20 bg-gray-800 rounded flex items-center justify-center mb-4">
+          <img src="image.svg" alt="Upload" class="w-16 h-16 select-none" />
+        </div>
+        <div class="text-gray-200 text-center mb-2">Upload an image or drag<br>and drop here</div>
+        <div class="text-gray-400 text-center text-sm">(.jpg, .png, .gif)</div>
+        <input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif" class="hidden">
+      </div>
+    </div>
+      <div id="asciiSection" class="hidden">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="font-semibold text-gray-200">ASCII Art Output</span>
+          <span class="flex gap-2">
+            <button id="copyBtn" type="button" title="Copy to clipboard" class="bg-gray-900 text-white p-2 rounded-lg border border-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed w-auto flex items-center justify-center" disabled>
+              <i data-lucide="copy" class="w-5 h-5"></i>
+            </button>
+            <button id="regenBtn" type="button" title="Regenerate" class="bg-gray-900 text-white p-2 rounded-lg border border-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed w-auto flex items-center justify-center" disabled>
+              <i data-lucide="refresh-ccw" class="w-5 h-5"></i>
+            </button>
+          </span>
+        </div>
+        <pre id="asciiOutput" class="w-full border border-gray-700 p-2 mb-2 bg-gray-900 text-gray-100 text-sm overflow-auto whitespace-pre min-h-96 empty:after:content-['ASCII_art_will_appear_here...'] empty:after:text-gray-600"></pre>
+        <div class="flex gap-2 mb-4 justify-start items-center mt-4">
+          <textarea id="refineInput" rows="1" placeholder="Describe a tweak or refinement (e.g. ‘make the buttons larger’)..." class="flex-1 bg-gray-900 text-white border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-150 max-h-32" style="min-width:120px;overflow:hidden;resize:none;word-break:break-word;"></textarea>
+          <button id="sendRefineBtn" type="button" title="Send refinement" class="bg-gray-900 text-white p-2 rounded-lg border border-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed w-auto flex items-center justify-center">
+            <i data-lucide="send" class="w-5 h-5"></i>
+          </button>
+        </div>    </div>
+    <p id="error" class="text-red-400 hidden mt-2"></p>
+    <p id="loading" class="text-gray-400 hidden mt-2">Processing...</p>
+    <div class="mt-6 text-center text-xs text-gray-500">Need help? Visit our <a href="#" class="underline">FAQ</a> or contact support.</div>
+  </div>
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const dropZone = document.getElementById('dropZone');
+    const asciiOutput = document.getElementById('asciiOutput');
+    const copyBtn = document.getElementById('copyBtn');
+    const asciiSection = document.getElementById('asciiSection');
+    const error = document.getElementById('error');
+    const loading = document.getElementById('loading');
+    const regenBtn = document.getElementById('regenBtn');
+
+    let lastFile = null;
+
+    // Drag and drop logic
+    dropZone.addEventListener('click', () => imageInput.click());
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') imageInput.click();
+    });
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-blue-500');
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-500');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-500');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        imageInput.files = e.dataTransfer.files;
+        handleFileUpload();
+      }
+    });
+    imageInput.addEventListener('change', handleFileUpload);
+
+    async function handleFileUpload() {
+      copyBtn.disabled = true;
+      regenBtn.disabled = true;
+      const file = imageInput.files[0] || lastFile;
+      if (!file) {
+        error.textContent = 'Please select an image file.';
+        error.classList.remove('hidden');
+        asciiSection.classList.add('hidden');
+        regenBtn.disabled = true;
+        return;
+      }
+      lastFile = file;
+      if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+        error.textContent = 'Only .jpg, .png, or .gif images are allowed.';
+        error.classList.remove('hidden');
+        asciiSection.classList.add('hidden');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        error.textContent = 'File size exceeds 5MB.';
+        error.classList.remove('hidden');
+        asciiSection.classList.add('hidden');
+        return;
+      }
+      error.classList.add('hidden');
+      loading.classList.remove('hidden');
+      // Upload image to /upload endpoint and display ASCII art
+      const formData = new FormData();
+      formData.append('image', file);
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) {
+          let errMsg = 'Error processing image.';
+          try {
+            const data = await response.json();
+            if (data.error) errMsg = data.error;
+          } catch {}
+          error.textContent = errMsg;
+          error.classList.remove('hidden');
+          asciiOutput.textContent = '';
+          copyBtn.disabled = true;
+          asciiSection.classList.add('hidden');
+          return;
+        }
+        // Streaming response
+        asciiOutput.textContent = '';
+        asciiSection.classList.remove('hidden');
+        copyBtn.disabled = true;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        while (!done) {
+          const { value, done: streamDone } = await reader.read();
+          if (value) {
+            const text = decoder.decode(value, { stream: !streamDone });
+            asciiOutput.textContent += text;
+          }
+          done = streamDone;
+        }
+        lastAscii = asciiOutput.textContent;
+        lastImageFile = lastFile;
+        copyBtn.disabled = false;
+        regenBtn.disabled = false;
+      } catch (err) {
+        error.textContent = 'Error processing image.';
+        error.classList.remove('hidden');
+        asciiOutput.textContent = '';
+        copyBtn.disabled = true;
+        asciiSection.classList.add('hidden');
+      } finally {
+        loading.classList.add('hidden');
+      }
+    }
+
+    regenBtn.addEventListener('click', async () => {
+      if (lastFile) {
+        // Re-run handleFileUpload with lastFile
+        loading.classList.remove('hidden');
+        error.classList.add('hidden');
+        asciiOutput.textContent = '';
+        copyBtn.disabled = true;
+        regenBtn.disabled = true;
+        await handleFileUpload();
+      }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(asciiOutput.textContent);
+        // Swap icon to checkmark
+        copyBtn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i>';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+          copyBtn.innerHTML = '<i data-lucide="copy" class="w-5 h-5"></i>';
+          if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+      } catch (err) {
+        error.textContent = 'Failed to copy to clipboard.';
+        error.classList.remove('hidden');
+      }
+    });
+    // Initialize Lucide icons after DOM update
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+    </script>
+    <script>
+      // --- ASCII UI refinement logic ---
+      const refineInput = document.getElementById('refineInput');
+      const sendRefineBtn = document.getElementById('sendRefineBtn');
+      let lastAscii = '';
+      let lastImageFile = null;
+
+      // Store ASCII after streaming
+      function storeAscii() {
+        lastAscii = asciiOutput.textContent;
+      }
+
+      // After streaming finishes, store ASCII
+      const origHandleFileUpload = handleFileUpload;
+      handleFileUpload = async function(...args) {
+        await origHandleFileUpload.apply(this, args);
+        // storeAscii() will be called after streaming in handleFileUpload
+        lastImageFile = lastFile;
+      };
+
+      // Remove setTimeout(storeAscii, 100) after regen
+      // We'll handle storing ASCII after streaming in both upload and refine
+
+
+      // Enable/disable refine UI
+      function setRefineDisabled(disabled) {
+        refineInput.disabled = disabled;
+        sendRefineBtn.disabled = disabled;
+      }
+
+      // Send refinement
+      sendRefineBtn.addEventListener('click', async () => {
+        const message = refineInput.value.trim();
+        console.log('[Refine] Clicked. message:', message, 'lastAscii:', lastAscii, 'lastImageFile:', lastImageFile);
+        if (!message) {
+          error.textContent = 'Please enter a refinement message.';
+          error.classList.remove('hidden');
+          return;
+        }
+        if (!lastAscii) {
+          error.textContent = 'No ASCII art to refine. Please generate ASCII art first.';
+          error.classList.remove('hidden');
+          return;
+        }
+        if (!lastImageFile) {
+          error.textContent = 'No image found for refinement.';
+          error.classList.remove('hidden');
+          return;
+        }
+        setRefineDisabled(true);
+        copyBtn.disabled = true;
+        regenBtn.disabled = true;
+        loading.classList.remove('hidden');
+        error.classList.add('hidden');
+        asciiOutput.textContent = '';
+        try {
+          const formData = new FormData();
+          formData.append('image', lastImageFile);
+          formData.append('ascii', lastAscii);
+          formData.append('message', message);
+          console.log('[Refine] Sending fetch to /refine...');
+          const response = await fetch('/refine', {
+            method: 'POST',
+            body: formData
+          });
+          if (!response.ok) {
+            let errMsg = 'Error refining ASCII art.';
+            try {
+              const data = await response.json();
+              if (data.error) errMsg = data.error;
+            } catch {}
+            error.textContent = errMsg;
+            error.classList.remove('hidden');
+            asciiOutput.textContent = '';
+            setRefineDisabled(false);
+            copyBtn.disabled = true;
+            regenBtn.disabled = false;
+            return;
+          }
+          // Streaming response
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let done = false;
+          while (!done) {
+            const { value, done: streamDone } = await reader.read();
+            if (value) {
+              const text = decoder.decode(value, { stream: !streamDone });
+              asciiOutput.textContent += text;
+            }
+            done = streamDone;
+          }
+          lastAscii = asciiOutput.textContent;
+          copyBtn.disabled = false;
+          regenBtn.disabled = false;
+        } catch (err) {
+          console.error('[Refine] Fetch error:', err);
+          error.textContent = 'Error refining ASCII art.';
+          error.classList.remove('hidden');
+          asciiOutput.textContent = '';
+          copyBtn.disabled = true;
+          regenBtn.disabled = false;
+        } finally {
+          refineInput.value = '';
+          setRefineDisabled(false);
+          loading.classList.add('hidden');
+        }
+      });
+      // Autosize refine input
+      refineInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+      });
+      // Enter key submits refinement
+      refineInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendRefineBtn.click();
+        }
+      });
+    </script>
+  </body>
+  </html>
